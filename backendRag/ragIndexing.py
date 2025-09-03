@@ -1,15 +1,27 @@
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain_core.prompts import PromptTemplate
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from youtube_transcript_api import YouTubeTranscriptApi
 from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
-
+import os
 load_dotenv()
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-pro", temperature=0.3)
+# load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
+
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+
+if not GOOGLE_API_KEY:
+    raise ValueError("❌ GOOGLE_API_KEY not found in .env file")
+
+# LLM for translation
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-pro",
+    temperature=0.3,
+    google_api_key=GOOGLE_API_KEY
+)
 #Step 1 :  Document Ingestion
 def get_transcript_in_english(video_id: str) -> str:
     """
@@ -56,10 +68,10 @@ def get_transcript_in_english(video_id: str) -> str:
     except Exception as e:
         return f"An error occurred: {e}"
 
-video_id = "Gfr50f6ZBvo"
+# video_id = "Gfr50f6ZBvo"
 
 
-transcript = get_transcript_in_english(video_id)
+# transcript = get_transcript_in_english(video_id)
 
 
 #Step 2 : Text Splitting
@@ -75,15 +87,15 @@ def make_chunks(transcript):
 
 
 #Step 3 : Generating Embeddings
+def build_retriever(video_id: str):
+    """
+    Build a retriever for the given YouTube video_id.
+    """
+    transcript = get_transcript_in_english(video_id)
+    if not transcript:
+        raise ValueError("No transcript available")
 
-embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-
-# Build FAISS vector store
-vector_store = FAISS.from_documents(make_chunks(transcript), embeddings)
-# print(vector_store.index_to_docstore_id)
-
-
-retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 4})
-
-result  = retriever.invoke('What is deepmind')
-print(result)
+    chunks = make_chunks(transcript)
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    vector_store = FAISS.from_documents(chunks, embeddings)
+    return vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 4})
