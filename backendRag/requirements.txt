@@ -1,0 +1,8 @@
+youtube-transcript-api
+langchain
+langchain-community 
+langchain-openai
+langchain_core
+faiss-cpu 
+tiktoken 
+python-dotenv

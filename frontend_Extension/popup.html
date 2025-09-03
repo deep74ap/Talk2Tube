@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>YouTube RAG Assistant</title>
+  <style>
+    body { font-family: Arial; padding: 10px; width: 320px; }
+    #messages { max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 5px; margin: 10px 0; }
+    input, button { width: 100%; margin-top: 5px; padding: 6px; }
+  </style>
+</head>
+<body>
+  <h3>Chat with YouTube Video</h3>
+  <input type="text" id="ytLink" placeholder="Paste YouTube URL">
+  <button id="useCurrent">Use Current Video</button>
+  <div id="messages"></div>
+  <input type="text" id="userInput" placeholder="Ask a question...">
+  <button id="send">Send</button>
+  <script src="popup.js"></script>
+</body>
+</html>
