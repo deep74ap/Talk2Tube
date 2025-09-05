@@ -1,9 +1,10 @@
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS
+from langchain_community.vectorstores import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from youtube_transcript_api import YouTubeTranscriptApi
 from langchain_google_genai import ChatGoogleGenerativeAI
+from pathlib import Path
 from dotenv import load_dotenv
 import os
 load_dotenv()
@@ -16,10 +17,21 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
     raise ValueError("❌ GOOGLE_API_KEY not found in .env file")
 
+
+# Persistent DB directory
+PERSIST_DIR = Path(__file__).resolve().parent / "chroma_db"
+PERSIST_DIR.mkdir(parents=True, exist_ok=True)
+
+
 # LLM for translation
 llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-pro",
     temperature=0.3,
+    google_api_key=GOOGLE_API_KEY
+)
+#Embeddings
+embeddings = GoogleGenerativeAIEmbeddings(
+    model="models/embedding-001",
     google_api_key=GOOGLE_API_KEY
 )
 #Step 1 :  Document Ingestion
@@ -89,13 +101,36 @@ def make_chunks(transcript):
 #Step 3 : Generating Embeddings
 def build_retriever(video_id: str):
     """
-    Build a retriever for the given YouTube video_id.
+    Build or load a retriever for the given YouTube video_id.
+    Uses persistent Chroma DB to avoid recomputing embeddings.
     """
+    collection_name = f"yt_{video_id}"
+    db_path = str(PERSIST_DIR)
+
+    # Try loading existing collection
+    db = Chroma(
+        collection_name=collection_name,
+        embedding_function=embeddings,
+        persist_directory="./chroma_db" 
+    )
+
+    if db._collection.count() > 0:
+        print(f"✅ Loaded existing retriever for {video_id}")
+        return db.as_retriever(search_type="similarity", search_kwargs={"k": 4}), "cached"
+
+    # Otherwise, fetch transcript + build
+    print(f"⚡ Building new retriever for {video_id}")
     transcript = get_transcript_in_english(video_id)
-    if not transcript:
-        raise ValueError("No transcript available")
+    if not transcript or transcript.startswith("❌"):
+        raise ValueError(f"Transcript not available: {transcript}")
 
     chunks = make_chunks(transcript)
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    vector_store = FAISS.from_documents(chunks, embeddings)
-    return vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 4})
+    db = Chroma.from_documents(
+        documents=chunks,
+        embedding=embeddings,
+        collection_name=collection_name,
+        persist_directory=db_path
+    )
+    # db.persist()
+    print(f"💾 Persisted embeddings for {video_id}")
+    return db.as_retriever(search_type="similarity", search_kwargs={"k": 4}), "new"

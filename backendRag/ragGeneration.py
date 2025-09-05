@@ -25,8 +25,8 @@ llm = ChatGoogleGenerativeAI(
 
 def get_answer(video_id: str, question: str) -> str:
     """Retrieve transcript, augment context, and generate an answer."""
-    retriever = build_retriever(video_id)
-
+    retriever,status = build_retriever(video_id)
+    print(f"📂 Retriever status for {video_id}: {status}")
     # Parallel chain: gather context + pass question
     parallel_chain = RunnableParallel({
         "context": retriever | RunnableLambda(format_docs),
